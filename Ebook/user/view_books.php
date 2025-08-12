@@ -107,7 +107,7 @@ include '_layout.php'
 
                 <!-- Read Book Button - now points to the separate PDF viewer page -->
                 <?php if (!empty($book['file_path']) && file_exists("../uploads/" . $book['file_path'])): ?>
-                    <a href="view_pdf.php?id=<?php echo $book_id; ?>" class="btn btn-success"><i class="fas fa-book-reader"></i> Read Book</a>
+                    <a href="" class="btn btn-success"><i class="fas fa-book-reader"></i> Read Book</a>
                 <?php endif; ?>
             </div>
         </div>

@@ -137,7 +137,7 @@ if (isset($_GET['id'])) {
 <body>
     <div class="top-bar">
         <h1 class="book-title"><?php echo htmlspecialchars($book['title']); ?></h1>
-        <a href="view_books.php?id=<?php echo $book_id; ?>" class="btn btn-outline-light btn-sm">
+        <a href="index.php?id=<?php echo $book_id; ?>" class="btn btn-outline-light btn-sm">
             <i class="fas fa-times"></i> Close Reader
         </a>
     </div>
