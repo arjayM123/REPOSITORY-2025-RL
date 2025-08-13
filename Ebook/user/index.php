@@ -1,13 +1,14 @@
 <?php
 require_once '../includes/db.php';
+require_once '../includes/tracking_functions.php';
 
 // Set page configuration
 $pageTitle = 'Home - ISUR-ORA Digital Library';
 
 // Get total counts for statistics
 $totalBooksQuery = "SELECT COUNT(*) as total FROM books";
-$totalBooksResult = $conn->query($totalBooksQuery);
-$totalBooks = $totalBooksResult->fetch_assoc()['total'] ?? 0;
+$totalBooksResult = $pdo->query($totalBooksQuery);
+$totalBooks = $totalBooksResult->fetch(PDO::FETCH_ASSOC)['total'] ?? 0;
 
 // Get total visitors (you may need to implement visitor tracking)
 $totalVisitors = 1234; // Placeholder - implement visitor tracking
@@ -18,29 +19,21 @@ include "_layout.php";
 
 <!-- Main Content with Bootstrap spacing for fixed navbar -->
 <div style="padding-top: 80px;">
-
-
     <!-- Books Showcase Section with Bootstrap background -->
     <section class="py-5 bg-light">
         <div class="container">
-
             <!-- Books Container -->
             <div id="booksContainer">
                 <?php
-                // Get all books with their information
+                // Get all books with their information including view and favorite counts
                 $allBooksQuery = "
-                    SELECT id, title, author, cover_image, type_of_material, department, created_at 
+                    SELECT id, title, author, cover_image, type_of_material, department, created_at,
+                           view_count, favorite_count
                     FROM books 
                     ORDER BY created_at DESC
                 ";
-                $allBooksResult = $conn->query($allBooksQuery);
-                $allBooks = [];
-                
-                if ($allBooksResult && $allBooksResult->num_rows > 0) {
-                    while ($book = $allBooksResult->fetch_assoc()) {
-                        $allBooks[] = $book;
-                    }
-                }
+                $allBooksResult = $pdo->query($allBooksQuery);
+                $allBooks = $allBooksResult->fetchAll();
 
                 // Group books by material type
                 $materialTypes = [];
@@ -92,17 +85,37 @@ include "_layout.php";
                                     } else {
                                         $imagePath = '../uploads/covers/' . $book['cover_image'];
                                     }
+                                    
+                                    // Check if this book is favorited by current user
+                                    $isFavorited = checkIfFavorited($pdo, $book['id']);
                                     ?>
-                                    <div class="col-6 col-md-4 col-lg-2 book-card" data-department="<?php echo htmlspecialchars($book['department'] ?? ''); ?>">
-                                        <div class="card h-100 shadow-sm border-0">
-                                            <a href="view_pdf.php?id=<?php echo $book['id']; ?>" class="text-decoration-none">
+                                    <div class="col-6 col-md-4 col-lg-2 book-card" 
+                                         data-department="<?php echo htmlspecialchars($book['department'] ?? ''); ?>">
+                                        <div class="card h-100 shadow-sm border-0" style="position: relative;">
+                                            <!-- Favorite Heart Button - Top Left -->
+                                            <button class="btn btn-sm favorite-btn" 
+                                                    data-book-id="<?php echo $book['id']; ?>"
+                                                    style="position: absolute; top: 8px; left: 8px; z-index: 10; 
+                                                           background: rgba(255, 255, 255, 0.9); border: 1px solid #dee2e6; 
+                                                           border-radius: 50%; width: 35px; height: 35px; padding: 0; 
+                                                           display: flex; align-items: center; justify-content: center;
+                                                           box-shadow: 0 2px 4px rgba(0,0,0,0.1);"
+                                                    title="Add to favorites">
+                                                <i class="bi <?php echo $isFavorited ? 'bi-heart-fill text-danger' : 'bi-heart text-muted'; ?>" 
+                                                   style="font-size: 16px;"></i>
+                                            </button>
+                                            
+                                            <a href="view_pdf.php?id=<?php echo $book['id']; ?>" 
+                                               class="text-decoration-none book-link" 
+                                               data-book-id="<?php echo $book['id']; ?>">
                                                 <!-- Book Cover with Bootstrap ratio -->
-                                                <div class="ratio ratio-4x3 bg-light">
+                                                <div class="bg-light">
                                                     <img src="<?php echo htmlspecialchars($imagePath); ?>" 
-                                                         class="card-img-top object-fit-cover rounded-top"
+                                                         class="img-fluid rounded"
                                                          alt="<?php echo htmlspecialchars($book['title']); ?>"
                                                          loading="lazy"
-                                                         onerror="this.src='../assets/images/genericBookCover.jpg';">
+                                                         onerror="this.src='../assets/images/genericBookCover.jpg';"
+                                                         style="width: 100%; height: 200px; object-fit: cover;">
                                                 </div>
                                                 
                                                 <!-- Book Info using Bootstrap card body -->
@@ -114,10 +127,20 @@ include "_layout.php";
                                                         <?php echo htmlspecialchars($book['author']); ?>
                                                     </p>
                                                     <?php if (!empty($book['department'])): ?>
-                                                        <small class="text-primary fw-medium">
+                                                        <small class="text-primary fw-medium d-block mb-2">
                                                             <?php echo htmlspecialchars($book['department']); ?>
                                                         </small>
                                                     <?php endif; ?>
+                                                    
+                                                    <!-- View and Favorite Stats -->
+                                                    <div class="d-flex justify-content-between align-items-center">
+                                                        <small class="text-muted">
+                                                            <i class="bi bi-eye me-1"></i><?php echo $book['view_count'] ?? 0; ?>
+                                                        </small>
+                                                        <small class="text-muted">
+                                                            <i class="bi bi-heart me-1"></i><?php echo $book['favorite_count'] ?? 0; ?>
+                                                        </small>
+                                                    </div>
                                                 </div>
                                             </a>
                                         </div>
@@ -149,33 +172,122 @@ include "_layout.php";
     </section>
 </div>
 
+<!-- Toast Notification for Favorites -->
+<div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1055;">
+    <div id="favoriteToast" class="toast" role="alert">
+        <div class="toast-header">
+            <i class="bi bi-heart-fill text-danger me-2"></i>
+            <strong class="me-auto">Favorites</strong>
+            <button type="button" class="btn-close" data-bs-dismiss="toast"></button>
+        </div>
+        <div class="toast-body" id="toastMessage">
+            <!-- Message will be inserted here -->
+        </div>
+    </div>
+</div>
+
+<?php $materialTypesCount = count($materialTypes); ?>
 <!-- Pure Bootstrap JS only -->
 <script>
     // Simple counter animation using vanilla JS
     document.addEventListener('DOMContentLoaded', function() {
-        // Define counter targets from PHP
-        const counters = [
-            { element: document.getElementById('totalBooksCounter'), target: <?php echo $totalBooks; ?> },
-            { element: document.getElementById('totalVisitorsCounter'), target: <?php echo $totalVisitors; ?> },
-            { element: document.getElementById('materialTypesCounter'), target: <?php echo $materialTypesCount; ?> }
-        ];
-
-        // Simple counter animation
-        counters.forEach(counter => {
-            let current = 0;
-            const increment = Math.ceil(counter.target / 50);
-            
-            const timer = setInterval(() => {
-                current += increment;
-                if (current >= counter.target) {
-                    counter.element.textContent = counter.target.toLocaleString();
-                    clearInterval(timer);
-                } else {
-                    counter.element.textContent = current.toLocaleString();
-                }
-            }, 50);
+        console.log('Page loaded - Total books: <?php echo $totalBooks; ?>');
+        
+        // Initialize favorite buttons
+        const favoriteButtons = document.querySelectorAll('.favorite-btn');
+        favoriteButtons.forEach(button => {
+            button.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                toggleFavorite(this);
+            });
+        });
+        
+        // Track book views when clicking on book links
+        const bookLinks = document.querySelectorAll('.book-link');
+        bookLinks.forEach(link => {
+            link.addEventListener('click', function(e) {
+                const bookId = this.getAttribute('data-book-id');
+                // Track the view (fire and forget)
+                fetch('track_view.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: 'book_id=' + bookId
+                }).catch(err => console.log('View tracking failed:', err));
+            });
         });
     });
+
+    // Toggle favorite function
+    function toggleFavorite(button) {
+        const bookId = button.getAttribute('data-book-id');
+        const heartIcon = button.querySelector('i');
+        
+        // Disable button temporarily
+        button.disabled = true;
+        
+        fetch('ajax_favorite.php', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: 'book_id=' + bookId
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Update heart icon
+                if (data.action === 'added') {
+                    heartIcon.className = 'bi bi-heart-fill text-danger';
+                    button.title = 'Remove from favorites';
+                }
+                
+                // Update favorite count in stats
+                const card = button.closest('.book-card');
+                const statsHeart = card.querySelector('.card-body small:last-child i.bi-heart');
+                if (statsHeart) {
+                    statsHeart.parentNode.innerHTML = '<i class="bi bi-heart me-1"></i>' + data.favorite_count;
+                }
+                
+                // Show toast notification
+                showToast(data.message, data.success ? 'success' : 'info');
+            } else {
+                showToast(data.message, 'warning');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            showToast('Error occurred while updating favorites', 'error');
+        })
+        .finally(() => {
+            // Re-enable button
+            button.disabled = false;
+        });
+    }
+
+    // Show toast notification
+    function showToast(message, type = 'info') {
+        const toastElement = document.getElementById('favoriteToast');
+        const toastMessage = document.getElementById('toastMessage');
+        const toastHeader = toastElement.querySelector('.toast-header');
+        
+        toastMessage.textContent = message;
+        
+        // Update toast style based on type
+        toastElement.className = 'toast';
+        if (type === 'success') {
+            toastElement.classList.add('border-success');
+        } else if (type === 'warning') {
+            toastElement.classList.add('border-warning');
+        } else if (type === 'error') {
+            toastElement.classList.add('border-danger');
+        }
+        
+        const toast = new bootstrap.Toast(toastElement);
+        toast.show();
+    }
 
     // Simple filter function using vanilla JS and Bootstrap classes
     function filterBooks(materialFilter, courseFilter) {
@@ -224,25 +336,27 @@ include "_layout.php";
             }
         });
         
-        // Update filter info using Bootstrap classes
-        let filterMessage = 'Showing ';
-        if (materialFilter !== 'all' && courseFilter !== 'all') {
-            filterMessage += materialFilter + ' materials for ' + courseFilter;
-        } else if (materialFilter !== 'all') {
-            filterMessage += materialFilter + ' materials';
-        } else if (courseFilter !== 'all') {
-            filterMessage += 'materials for ' + courseFilter;
-        } else {
-            filterMessage += 'all materials';
-        }
-        
-        filterText.textContent = filterMessage;
-        
-        // Show/hide filter info using Bootstrap classes
-        if (materialFilter !== 'all' || courseFilter !== 'all') {
-            filterInfo.classList.remove('d-none');
-        } else {
-            filterInfo.classList.add('d-none');
+        // Update filter info using Bootstrap classes (only if elements exist)
+        if (filterInfo && filterText) {
+            let filterMessage = 'Showing ';
+            if (materialFilter !== 'all' && courseFilter !== 'all') {
+                filterMessage += materialFilter + ' materials for ' + courseFilter;
+            } else if (materialFilter !== 'all') {
+                filterMessage += materialFilter + ' materials';
+            } else if (courseFilter !== 'all') {
+                filterMessage += 'materials for ' + courseFilter;
+            } else {
+                filterMessage += 'all materials';
+            }
+            
+            filterText.textContent = filterMessage;
+            
+            // Show/hide filter info using Bootstrap classes
+            if (materialFilter !== 'all' || courseFilter !== 'all') {
+                filterInfo.classList.remove('d-none');
+            } else {
+                filterInfo.classList.add('d-none');
+            }
         }
         
         // Show no results message if needed using Bootstrap components
@@ -271,8 +385,3 @@ include "_layout.php";
         }
     }
 </script>
-
-<?php
-// Close database connection
-$conn->close();
-?>
