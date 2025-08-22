@@ -1,12 +1,13 @@
 <?php
+
 session_start();
 
-// Clear admin session
-unset($_SESSION['is_admin']);
+// Clear all session variables
+$_SESSION = array();
 
-// Destroy the entire session
+// Destroy the session
 session_destroy();
 
-// Redirect back to books page
-header('Location: index.php');
-exit;
+// Redirect to login page
+header("Location: login.php");
+exit();

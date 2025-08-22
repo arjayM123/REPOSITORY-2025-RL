@@ -1,11 +1,5 @@
 <?php
-// reports.php - Professional Library Reports System
 
-// Check if admin is logged in
-if (!isset($_SESSION['is_admin']) || !$_SESSION['is_admin']) {
-    header('Location: login.php');
-    exit();
-}
 
 require_once '../includes/db.php';
 
@@ -38,20 +32,12 @@ try {
     $departments = [];
 }
 
-// Handle export requests BEFORE any HTML output
-if (!empty($export_format) && in_array($export_format, ['excel', 'word'])) {
-    // Clear any output that might have been sent
-    if (ob_get_level()) {
-        ob_end_clean();
-    }
-    handleExport($pdo, $report_type, $date_from, $date_to, $department, $export_format);
-    exit();
-}
 
 // Get report data based on type
 $report_data = getReportData($pdo, $report_type, $date_from, $date_to, $department);
 
-function getReportData($pdo, $report_type, $date_from, $date_to, $department) {
+function getReportData($pdo, $report_type, $date_from, $date_to, $department)
+{
     try {
         switch ($report_type) {
             case 'books':
@@ -68,14 +54,14 @@ function getReportData($pdo, $report_type, $date_from, $date_to, $department) {
                 FROM books 
                 WHERE DATE(created_at) BETWEEN ? AND ?";
                 $params = [$date_from, $date_to];
-                
+
                 if (!empty($department)) {
                     $sql .= " AND department = ?";
                     $params[] = $department;
                 }
                 $sql .= " ORDER BY created_at DESC";
                 break;
-                
+
             case 'summary':
                 $sql = "SELECT 
                     COUNT(*) as total_books,
@@ -88,13 +74,13 @@ function getReportData($pdo, $report_type, $date_from, $date_to, $department) {
                 FROM books 
                 WHERE DATE(created_at) BETWEEN ? AND ?";
                 $params = [$date_from, $date_to];
-                
+
                 if (!empty($department)) {
                     $sql .= " AND department = ?";
                     $params[] = $department;
                 }
                 break;
-                
+
             case 'by_department':
                 $sql = "SELECT 
                     COALESCE(department, 'Unassigned') as department,
@@ -104,14 +90,58 @@ function getReportData($pdo, $report_type, $date_from, $date_to, $department) {
                 FROM books 
                 WHERE DATE(created_at) BETWEEN ? AND ?";
                 $params = [$date_from, $date_to];
-                
+
                 if (!empty($department)) {
                     $sql .= " AND department = ?";
                     $params[] = $department;
                 }
                 $sql .= " GROUP BY department ORDER BY total_books DESC";
                 break;
-                
+
+            case 'popular_books':
+                $params = [$date_from, $date_to];
+                $sql = "SELECT 
+        b.id,
+        b.title,
+        b.author,
+        b.department,
+        COUNT(DISTINCT bv.ip_address) as view_count,
+        COUNT(DISTINCT bf.ip_address) as favorite_count,
+        b.copies,
+        DATE(b.created_at) as date_added
+    FROM books b
+    LEFT JOIN book_views bv ON b.id = bv.book_id
+    LEFT JOIN book_favorites bf ON b.id = bf.book_id
+    WHERE DATE(b.created_at) BETWEEN ? AND ?
+    AND b.is_deleted = 0";
+
+                if (!empty($department)) {
+                    $sql .= " AND b.department = ?";
+                    $params[] = $department;
+                }
+
+                $sql .= " GROUP BY b.id
+        ORDER BY view_count DESC, favorite_count DESC
+        LIMIT 50";
+                break;
+
+            case 'book_requests':
+                $params = [$date_from, $date_to];
+                $sql = "SELECT 
+        id,
+        student_name,
+        id_number,
+        book_title,
+        book_author,
+        book_copy as copies_requested,
+        contact,
+        address,
+        DATE(requested_at) as request_date
+    FROM book_requests
+    WHERE DATE(requested_at) BETWEEN ? AND ?
+    ORDER BY requested_at DESC";
+                break;
+
             case 'by_author':
                 $sql = "SELECT 
                     author,
@@ -121,14 +151,14 @@ function getReportData($pdo, $report_type, $date_from, $date_to, $department) {
                 FROM books 
                 WHERE DATE(created_at) BETWEEN ? AND ? AND is_deleted = 0";
                 $params = [$date_from, $date_to];
-                
+
                 if (!empty($department)) {
                     $sql .= " AND department = ?";
                     $params[] = $department;
                 }
                 $sql .= " GROUP BY author ORDER BY total_books DESC";
                 break;
-                
+
             case 'visitors':
                 $sql = "SELECT 
                     DATE(visit_date) as visit_date,
@@ -140,11 +170,11 @@ function getReportData($pdo, $report_type, $date_from, $date_to, $department) {
                 ORDER BY visit_date DESC";
                 $params = [$date_from, $date_to];
                 break;
-                
+
             default:
                 return [];
         }
-        
+
         $stmt = $pdo->prepare($sql);
         $stmt->execute($params);
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
@@ -153,139 +183,7 @@ function getReportData($pdo, $report_type, $date_from, $date_to, $department) {
     }
 }
 
-function handleExport($pdo, $report_type, $date_from, $date_to, $department, $export_format) {
-    $data = getReportData($pdo, $report_type, $date_from, $date_to, $department);
-    
-    if ($export_format == 'excel') {
-        exportToExcel($data, $report_type, $date_from, $date_to);
-    } elseif ($export_format == 'word') {
-        exportToWord($data, $report_type, $date_from, $date_to);
-    }
-}
 
-function exportToExcel($data, $report_type, $date_from, $date_to) {
-    
-    $spreadsheet = new Spreadsheet();
-    $sheet = $spreadsheet->getActiveSheet();
-    
-    // Set document properties
-    $spreadsheet->getProperties()
-        ->setCreator("ORA Library System")
-        ->setTitle(ucfirst(str_replace('_', ' ', $report_type)) . " Report")
-        ->setDescription("Library report generated on " . date('Y-m-d H:i:s'));
-    
-    // Header styling
-    $headerStyle = [
-        'font' => ['bold' => true, 'color' => ['rgb' => 'FFFFFF']],
-        'fill' => ['fillType' => Fill::FILL_SOLID, 'startColor' => ['rgb' => '0d6efd']],
-        'alignment' => ['horizontal' => Alignment::HORIZONTAL_CENTER]
-    ];
-    
-    // Title
-    $sheet->setCellValue('A1', 'ORA Library System - ' . ucfirst(str_replace('_', ' ', $report_type)) . ' Report');
-    $sheet->setCellValue('A2', 'Period: ' . $date_from . ' to ' . $date_to);
-    $sheet->setCellValue('A3', 'Generated on: ' . date('Y-m-d H:i:s'));
-    
-    $sheet->getStyle('A1')->applyFromArray(['font' => ['bold' => true, 'size' => 16]]);
-    $sheet->getStyle('A2:A3')->applyFromArray(['font' => ['italic' => true]]);
-    
-    if (empty($data)) {
-        $sheet->setCellValue('A5', 'No data found for the selected period.');
-        $filename = 'library_report_' . $report_type . '_' . date('Y-m-d') . '.xlsx';
-    } else {
-        $row = 5;
-        $headers = array_keys($data[0]);
-        
-        // Set headers
-        $col = 'A';
-        foreach ($headers as $header) {
-            $sheet->setCellValue($col . $row, ucfirst(str_replace('_', ' ', $header)));
-            $sheet->getStyle($col . $row)->applyFromArray($headerStyle);
-            $col++;
-        }
-        
-        // Add data
-        $row++;
-        foreach ($data as $record) {
-            $col = 'A';
-            foreach ($record as $value) {
-                $sheet->setCellValue($col . $row, $value);
-                $col++;
-            }
-            $row++;
-        }
-        
-        // Auto-size columns
-        foreach (range('A', $sheet->getHighestColumn()) as $col) {
-            $sheet->getColumnDimension($col)->setAutoSize(true);
-        }
-        
-        $filename = 'library_report_' . $report_type . '_' . date('Y-m-d') . '.xlsx';
-    }
-    
-    // Output file
-    header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    header('Content-Disposition: attachment;filename="' . $filename . '"');
-    header('Cache-Control: max-age=0');
-    
-    $writer = new Xlsx($spreadsheet);
-    $writer->save('php://output');
-}
-
-function exportToWord($data, $report_type, $date_from, $date_to) {
-    
-    $phpWord = new PhpWord();
-    $section = $phpWord->addSection();
-    
-    // Title
-    $section->addText('ORA Library System', ['bold' => true, 'size' => 18], ['alignment' => 'center']);
-    $section->addText(ucfirst(str_replace('_', ' ', $report_type)) . ' Report', ['bold' => true, 'size' => 16], ['alignment' => 'center']);
-    $section->addText('Period: ' . $date_from . ' to ' . $date_to, ['size' => 12], ['alignment' => 'center']);
-    $section->addText('Generated on: ' . date('Y-m-d H:i:s'), ['italic' => true, 'size' => 10], ['alignment' => 'center']);
-    $section->addTextBreak(2);
-    
-    if (empty($data)) {
-        $section->addText('No data found for the selected period.', ['size' => 12]);
-    } else {
-        // Table styling
-        $tableStyle = [
-            'borderSize' => 6,
-            'borderColor' => '0d6efd',
-            'cellMargin' => Converter::inchToTwip(0.1),
-            'width' => 100 * 50
-        ];
-        
-        $headerStyle = ['bold' => true, 'color' => 'ffffff'];
-        $headerCellStyle = ['bgColor' => '0d6efd'];
-        
-        $table = $section->addTable($tableStyle);
-        
-        // Headers
-        $headers = array_keys($data[0]);
-        $table->addRow();
-        foreach ($headers as $header) {
-            $table->addCell()->addText(ucfirst(str_replace('_', ' ', $header)), $headerStyle, $headerCellStyle);
-        }
-        
-        // Data rows
-        foreach ($data as $record) {
-            $table->addRow();
-            foreach ($record as $value) {
-                $table->addCell()->addText((string)$value);
-            }
-        }
-    }
-    
-    $filename = 'library_report_' . $report_type . '_' . date('Y-m-d') . '.docx';
-    
-    // Output file
-    header('Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-    header('Content-Disposition: attachment;filename="' . $filename . '"');
-    header('Cache-Control: max-age=0');
-    
-    $writer = \PhpOffice\PhpWord\IOFactory::createWriter($phpWord, 'Word2007');
-    $writer->save('php://output');
-}
 ?>
 
 <!-- Reports Page Content -->
@@ -298,16 +196,7 @@ function exportToWord($data, $report_type, $date_from, $date_to) {
                     <h2 class="h3 mb-1"><i class="bi bi-graph-up me-2"></i>Reports & Analytics</h2>
                     <p class="text-muted mb-0">Generate comprehensive library reports and export data</p>
                 </div>
-                <div class="d-flex gap-2">
-                    <?php if (!empty($report_data)): ?>
-                    <a href="export_handler.php?<?php echo http_build_query($_GET); ?>&export=excel" class="btn btn-success">
-                        <i class="bi bi-file-earmark-excel me-2"></i>Export Excel
-                    </a>
-                    <a href="export_handler.php?<?php echo http_build_query($_GET); ?>&export=word" class="btn btn-primary">
-                        <i class="bi bi-file-earmark-word me-2"></i>Export Word
-                    </a>
-                    <?php endif; ?>
-                </div>
+
             </div>
         </div>
     </div>
@@ -327,39 +216,46 @@ function exportToWord($data, $report_type, $date_from, $date_to) {
                             <div class="col-md-3">
                                 <label for="report_type" class="form-label fw-semibold">Report Type</label>
                                 <select name="report_type" id="report_type" class="form-select">
-                                    <option value="books" <?php echo $report_type == 'books' ? 'selected' : ''; ?>>Books Catalog</option>
-                                    <option value="summary" <?php echo $report_type == 'summary' ? 'selected' : ''; ?>>Summary Statistics</option>
+                                    <option value="books" <?php echo $report_type == 'books' ? 'selected' : ''; ?>>Books
+                                        Catalog</option>
+                                    <option value="summary" <?php echo $report_type == 'summary' ? 'selected' : ''; ?>>
+                                        Summary Statistics</option>
                                     <option value="by_department" <?php echo $report_type == 'by_department' ? 'selected' : ''; ?>>By Department</option>
                                     <option value="by_author" <?php echo $report_type == 'by_author' ? 'selected' : ''; ?>>By Author</option>
-                                    <option value="visitors" <?php echo $report_type == 'visitors' ? 'selected' : ''; ?>>Visitor Analytics</option>
+                                    <option value="popular_books" <?php echo $report_type == 'popular_books' ? 'selected' : ''; ?>>Popular Books</option>
+                                    <option value="book_requests" <?php echo $report_type == 'book_requests' ? 'selected' : ''; ?>>Book Requests</option>
+                                    <option value="visitors" <?php echo $report_type == 'visitors' ? 'selected' : ''; ?>>
+                                        Visitor Analytics</option>
                                 </select>
                             </div>
-                            
+
                             <!-- Date From -->
                             <div class="col-md-2">
                                 <label for="date_from" class="form-label fw-semibold">Date From</label>
-                                <input type="date" name="date_from" id="date_from" class="form-control" value="<?php echo htmlspecialchars($date_from); ?>">
+                                <input type="date" name="date_from" id="date_from" class="form-control"
+                                    value="<?php echo htmlspecialchars($date_from); ?>">
                             </div>
-                            
+
                             <!-- Date To -->
                             <div class="col-md-2">
                                 <label for="date_to" class="form-label fw-semibold">Date To</label>
-                                <input type="date" name="date_to" id="date_to" class="form-control" value="<?php echo htmlspecialchars($date_to); ?>">
+                                <input type="date" name="date_to" id="date_to" class="form-control"
+                                    value="<?php echo htmlspecialchars($date_to); ?>">
                             </div>
-                            
+
                             <!-- Department -->
                             <div class="col-md-3">
                                 <label for="department" class="form-label fw-semibold">Department</label>
                                 <select name="department" id="department" class="form-select">
                                     <option value="">All Departments</option>
                                     <?php foreach ($departments as $dept): ?>
-                                    <option value="<?php echo htmlspecialchars($dept); ?>" <?php echo $department == $dept ? 'selected' : ''; ?>>
-                                        <?php echo htmlspecialchars($dept); ?>
-                                    </option>
+                                        <option value="<?php echo htmlspecialchars($dept); ?>" <?php echo $department == $dept ? 'selected' : ''; ?>>
+                                            <?php echo htmlspecialchars($dept); ?>
+                                        </option>
                                     <?php endforeach; ?>
                                 </select>
                             </div>
-                            
+
                             <!-- Generate Button -->
                             <div class="col-md-2 d-flex align-items-end">
                                 <button type="submit" class="btn btn-primary w-100">
@@ -383,123 +279,344 @@ function exportToWord($data, $report_type, $date_from, $date_to) {
                         <?php echo ucfirst(str_replace('_', ' ', $report_type)); ?> Report
                         <span class="badge bg-primary ms-2"><?php echo count($report_data); ?> records</span>
                     </h5>
-                    <small class="text-muted">
-                        Period: <?php echo $date_from; ?> to <?php echo $date_to; ?>
-                    </small>
                 </div>
                 <div class="card-body p-0">
                     <?php if (empty($report_data)): ?>
-                    <div class="text-center py-5">
-                        <i class="bi bi-inbox display-1 text-muted"></i>
-                        <h4 class="mt-3 text-muted">No Data Found</h4>
-                        <p class="text-muted">No records found for the selected filters. Try adjusting your search criteria.</p>
-                    </div>
+                        <div class="text-center py-5">
+                            <i class="bi bi-inbox display-1 text-muted"></i>
+                            <h4 class="mt-3 text-muted">No Data Found</h4>
+                            <p class="text-muted">No records found for the selected filters. Try adjusting your search
+                                criteria.</p>
+                        </div>
                     <?php else: ?>
-                    <div class="table-responsive">
-                        <table class="table table-hover mb-0">
-                            <thead class="table-dark">
-                                <tr>
-                                    <?php foreach (array_keys($report_data[0]) as $header): ?>
-                                    <th class="fw-semibold"><?php echo ucfirst(str_replace('_', ' ', $header)); ?></th>
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0" id="reportTable">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th class="fw-semibold">No.</th>
+                                        <?php
+                                        // Skip the 'id' column if it exists
+                                        foreach (array_keys($report_data[0]) as $header):
+                                            if (strtolower($header) !== 'id'):
+                                                ?>
+                                                <th class="fw-semibold"><?php echo ucfirst(str_replace('_', ' ', $header)); ?></th>
+                                            <?php
+                                            endif;
+                                        endforeach;
+                                        ?>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php
+                                    $rowNumber = 1;
+                                    foreach ($report_data as $row):
+                                        ?>
+                                        <tr>
+                                            <td class="fw-semibold text-center"><?php echo $rowNumber++; ?></td>
+                                            <?php
+                                            foreach ($row as $key => $value):
+                                                if (strtolower($key) !== 'id'):
+                                                    ?>
+                                                    <td>
+                                                        <?php if ($key === 'status'): ?>
+                                                            <?php if ($value === 'Active'): ?>
+                                                                <span class="badge bg-success">Active</span>
+                                                            <?php elseif ($value === 'Locked'): ?>
+                                                                <span class="badge bg-warning">Locked</span>
+                                                            <?php else: ?>
+                                                                <span class="badge bg-danger">Deleted</span>
+                                                            <?php endif; ?>
+                                                        <?php elseif (is_numeric($value) && $value > 0): ?>
+                                                            <span class="fw-semibold"><?php echo number_format($value); ?></span>
+                                                        <?php else: ?>
+                                                            <?php echo htmlspecialchars($value ?? 'N/A'); ?>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                <?php
+                                                endif;
+                                            endforeach;
+                                            ?>
+                                        </tr>
                                     <?php endforeach; ?>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($report_data as $row): ?>
-                                <tr>
-                                    <?php foreach ($row as $key => $value): ?>
-                                    <td>
-                                        <?php if ($key === 'status'): ?>
-                                            <?php if ($value === 'Active'): ?>
-                                                <span class="badge bg-success">Active</span>
-                                            <?php elseif ($value === 'Locked'): ?>
-                                                <span class="badge bg-warning">Locked</span>
-                                            <?php else: ?>
-                                                <span class="badge bg-danger">Deleted</span>
-                                            <?php endif; ?>
-                                        <?php elseif (is_numeric($value) && $value > 0): ?>
-                                            <span class="fw-semibold"><?php echo number_format($value); ?></span>
-                                        <?php else: ?>
-                                            <?php echo htmlspecialchars($value ?? 'N/A'); ?>
-                                        <?php endif; ?>
-                                    </td>
-                                    <?php endforeach; ?>
-                                </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
-                    
-                    <!-- Pagination would go here if needed -->
-                    <div class="card-footer bg-light">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <small class="text-muted">
-                                Showing <?php echo count($report_data); ?> record(s) 
-                                <?php if (!empty($department)): ?>
-                                    for department: <strong><?php echo htmlspecialchars($department); ?></strong>
-                                <?php endif; ?>
-                            </small>
-                            <div class="d-flex gap-2">
-                                <button onclick="window.print()" class="btn btn-outline-secondary btn-sm">
-                                    <i class="bi bi-printer me-1"></i>Print
-                                </button>
-                                <?php if (!empty($report_data)): ?>
-                                <a href="export_handler.php?<?php echo http_build_query(array_merge($_GET, ['export' => 'excel'])); ?>" class="btn btn-success btn-sm">
-                                    <i class="bi bi-download me-1"></i>Excel
-                                </a>
-                                <a href="export_handler.php?<?php echo http_build_query(array_merge($_GET, ['export' => 'word'])); ?>" class="btn btn-primary btn-sm">
-                                    <i class="bi bi-download me-1"></i>Word
-                                </a>
-                                <?php endif; ?>
+                                </tbody>
+<tfoot class="table-light">
+    <tr>
+        <td colspan="<?php echo count(array_keys($report_data[0])); ?>" class="text-end pe-4">
+            <strong>Period: <?php echo date('M d, Y', strtotime($date_from)); ?> - <?php echo date('M d, Y', strtotime($date_to)); ?> | Total Records: <?php echo count($report_data); ?></strong>
+        </td>
+    </tr>
+</tfoot>
+                            </table>
+                        </div>
+
+                        <!-- Pagination would go here if needed -->
+                        <div class="card-footer bg-light">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div class="d-flex gap-2">
+                                    <button onclick="window.print()" class="btn btn-outline-secondary btn-sm">
+                                        <i class="bi bi-printer me-1"></i>Print
+                                    </button>
+                                </div>
                             </div>
                         </div>
-                    </div>
                     <?php endif; ?>
                 </div>
             </div>
         </div>
     </div>
 </div>
+<style>
+    
+    /* Enhanced Print Styles - Better visuals when printing the table */
+    @media print {
 
-<!-- Print Styles -->
-<style media="print">
-    .btn, .card-footer, .card-header .d-flex > div:last-child {
-        display: none !important;
+        /* Hide everything except the table content */
+        body * {
+            visibility: hidden;
+        }
+
+        /* Show only the table and its contents */
+        .table-responsive,
+        .table-responsive *,
+        .card:has(.table-responsive),
+        .card:has(.table-responsive) * {
+            visibility: visible;
+        }
+
+        /* Page setup */
+        @page {
+            margin: 0.5in;
+            size: landscape;
+        }
+
+        /* Center and position the table container */
+        .card:has(.table-responsive) {
+            position: absolute;
+            left: 50%;
+            top: 0;
+            transform: translateX(-50%);
+            width: 95% !important;
+            max-width: none !important;
+            box-shadow: none !important;
+            border: none !important;
+        }
+
+        .card-body {
+            padding: 0 !important;
+        }
+
+        /* Enhanced table styling */
+        .table {
+            font-size: 9px !important;
+            width: 100% !important;
+            border-collapse: collapse !important;
+            margin: 0 auto !important;
+            background-color: white !important;
+        }
+
+        /* Beautiful table header */
+        .table thead {
+            display: table-header-group !important;
+        }
+
+        .table thead th {
+            background-color: #1a365d !important;
+            color: white !important;
+            font-weight: bold !important;
+            text-align: center !important;
+            padding: 10px 6px !important;
+            border: 1px solid #2d3748 !important;
+            font-size: 8px !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.5px !important;
+            vertical-align: middle !important;
+        }
+
+        /* Enhanced table body */
+    .table tfoot td {
+        padding: 10px 6px !important;
+        border-top: 2px solid #2d3748 !important;
+        font-size: 9px !important;
+        font-weight: bold !important;
+        color: #1a365d !important;
+        background-color: #f7fafc !important;
     }
-    .card {
-        border: none !important;
-        box-shadow: none !important;
+        .table thead th,
+    .table tbody td {
+        text-align: center !important;
+        vertical-align: middle !important;
     }
-    body {
-        font-size: 12px;
+
+        /* Alternating row colors for better readability */
+        .table tbody tr:nth-child(even) td {
+            background-color: #f7fafc !important;
+        }
+
+        .table tbody tr:nth-child(odd) td {
+            background-color: white !important;
+        }
+
+        /* Enhanced badge styling for print */
+        .badge {
+            font-size: 7px !important;
+            padding: 2px 6px !important;
+            border-radius: 8px !important;
+            font-weight: bold !important;
+            text-transform: uppercase !important;
+            letter-spacing: 0.3px !important;
+        }
+
+        /* Status badge colors - properly visible in print */
+        .badge.bg-success {
+            background-color: #22c55e !important;
+            color: white !important;
+            border: 1px solid #16a34a !important;
+        }
+
+        .badge.bg-warning {
+            background-color: #f59e0b !important;
+            color: #000 !important;
+            border: 1px solid #d97706 !important;
+        }
+
+        .badge.bg-danger {
+            background-color: #ef4444 !important;
+            color: white !important;
+            border: 1px solid #dc2626 !important;
+        }
+
+        /* Numeric values styling */
+        .fw-semibold {
+            font-weight: 600 !important;
+            color: #1a365d !important;
+        }
+
+        /* Add school header before the table */
+        .table-responsive::before {
+            content: "";
+            display: block;
+            height: 80px;
+            background-image: url('../assets/images/images-removebg-preview.png');
+            background-repeat: no-repeat;
+            background-position: left center;
+            background-size: 60px;
+            margin-bottom: 20px;
+            position: relative;
+            top: -20px;
+        }
+
+        /* Add school header before the table */
+        .table-responsive::before {
+            content: "";
+            display: block;
+            height: 80px;
+            background-image: url('../assets/images/images-removebg-preview.png');
+            background-repeat: no-repeat;
+            background-position: left center;
+            background-size: 60px;
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        /* University name - large and bold */
+        .card:has(.table-responsive)::after {
+            content: "ISABELA STATE UNIVERSITY";
+            display: block;
+            position: absolute;
+            top: 5px;
+            left: 80px;
+            font-size: 18px !important;
+            font-weight: bold !important;
+            color: #1a365d !important;
+            line-height: 1.2;
+        }
+
+        /* Add campus name with smaller text using a different approach */
+        .table-responsive::after {
+            content: "Roxas Campus" "\A" " LIBRARY REPORT - <?php echo strtoupper(str_replace('_', ' ', $report_type)); ?>";
+            white-space: pre-line;
+            display: block;
+            position: absolute;
+            top: 25px;
+            left: 80px;
+            font-size: 12px !important;
+            color: #4a5568 !important;
+            line-height: 1.4;
+            border-bottom: 2px solid #1a365d !important;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+            width: calc(100% - 90px);
+        }
+
+        /* Style the library report line specifically */
+        .table-responsive::after {
+            background: linear-gradient(to bottom,
+                    #4a5568 0%,
+                    /* Campus name color - smaller */
+                    #4a5568 15px,
+                    /* Campus name */
+                    transparent 15px,
+                    transparent 20px,
+                    #1a365d 20px,
+                    /* Report title color - larger */
+                    #1a365d 100%
+                    /* Report title */
+                );
+            background-clip: text;
+            -webkit-background-clip: text;
+        }
+
+        /* Ensure proper page breaks */
+        .table tr {
+            page-break-inside: avoid !important;
+        }
+
+        .table thead tr {
+            page-break-after: avoid !important;
+        }
+
+        /* Hide card headers and footers */
+        .card-header,
+        .card-footer {
+            display: none !important;
+        }
+
+        /* Better spacing for the entire print layout */
+        .table-responsive {
+            margin: 20px 0 !important;
+            border-radius: 0 !important;
+            overflow: visible !important;
+        }
+
+        /* Make sure table borders are crisp */
+        .table,
+        .table th,
+        .table td {
+            border-color: #2d3748 !important;
+            border-style: solid !important;
+        }
     }
-    .table {
-        font-size: 11px;
+
+    /* Add JavaScript to set dynamic content for print */
+    @media print {
+        .table-responsive {
+            --print-date: "<?php echo date('M d, Y H:i'); ?>";
+            --record-count: "<?php echo count($report_data); ?>";
+        }
     }
 </style>
 
 <script>
-// Auto-submit form when report type changes
-document.getElementById('report_type').addEventListener('change', function() {
-    // You can auto-submit here or let user click Generate Report
-    // this.form.submit();
-});
+    // Simple function to trigger the enhanced print
+    function printTable() {
+        // Set dynamic data for print pseudo-elements
+        const tableResponsive = document.querySelector('.table-responsive');
+        if (tableResponsive) {
+            tableResponsive.setAttribute('data-print-date', new Date().toLocaleDateString());
+            tableResponsive.setAttribute('data-record-count', document.querySelectorAll('.table tbody tr').length);
+        }
 
-// Set default dates if empty
-document.addEventListener('DOMContentLoaded', function() {
-    const dateFrom = document.getElementById('date_from');
-    const dateTo = document.getElementById('date_to');
-    
-    if (!dateFrom.value) {
-        const now = new Date();
-        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
-        dateFrom.value = firstDay.toISOString().split('T')[0];
+        // Use the browser's print with our enhanced CSS
+        window.print();
     }
-    
-    if (!dateTo.value) {
-        const now = new Date();
-        const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-        dateTo.value = lastDay.toISOString().split('T')[0];
-    }
-});
 </script>

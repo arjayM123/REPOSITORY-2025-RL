@@ -110,23 +110,16 @@
                         </ul>
                     </li>
 
-                    <!-- Favorites -->
-                    <li class="nav-item">
-                        <a class="nav-link fw-medium px-3 <?php echo basename($_SERVER['PHP_SELF']) == 'favorites.php' ? 'active text-primary' : ''; ?>" href="favorites.php">
-                            <i class="bi bi-heart me-1"></i>Favorites
-                        </a>
-                    </li>
-
                     <!-- Requested Books -->
                     <li class="nav-item">
-                        <a class="nav-link fw-medium px-3 <?php echo basename($_SERVER['PHP_SELF']) == 'requested_books.php' ? 'active text-primary' : ''; ?>" href="requested_books.php">
-                            <i class="bi bi-bookmark me-1"></i>Requested Books
+                        <a class="nav-link fw-medium px-3 <?php echo basename($_SERVER['PHP_SELF']) == 'book_request.php' ? 'active text-primary' : ''; ?>" href="book_request.php">
+                            <i class="bi bi-bookmark me-1"></i>Request a Book
                         </a>
                     </li>
 
                     <!-- About Us -->
                     <li class="nav-item">
-                        <a class="nav-link fw-medium px-3 <?php echo basename($_SERVER['PHP_SELF']) == 'about.php' ? 'active text-primary' : ''; ?>" href="about.php">
+                        <a class="nav-link fw-medium px-3 <?php echo basename($_SERVER['PHP_SELF']) == 'footer.php' ? 'active text-primary' : ''; ?>" href="#about-footer">
                             <i class="bi bi-info-circle me-1"></i>About Us
                         </a>
                     </li>
@@ -138,26 +131,28 @@
     <!-- Bootstrap JS (Required for dropdowns and mobile menu) -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     
-    <!-- Simple filter function using vanilla JS -->
+    <!-- Filter function that works with the index page -->
     <script>
-        // Simple filter function that works with any page
         function applyFilter(material, course) {
-            // Check if we're on the index page and if filterBooks function exists
-            if (typeof filterBooks === 'function') {
-                filterBooks(material, course);
+            // Check if we're on the index page and if the filtering function exists
+            if (typeof window.filterBooksByCategory === 'function') {
+                // Call the index page filter function
+                window.filterBooksByCategory(material, course);
             } else {
                 // For other pages, redirect to index with parameters
                 let url = 'index.php?';
                 if (material !== 'all') url += 'material=' + encodeURIComponent(material) + '&';
                 if (course !== 'all') url += 'course=' + encodeURIComponent(course) + '&';
-                window.location.href = url.replace(/&$/, '');
+                window.location.href = url.replace(/[&?]$/, '');
             }
             
-            // Close dropdown after selection (Bootstrap handles this automatically but we can ensure it)
+            // Close dropdown after selection
             const dropdowns = document.querySelectorAll('.dropdown-menu.show');
             dropdowns.forEach(dropdown => {
-                const bsDropdown = new bootstrap.Dropdown(dropdown.previousElementSibling);
-                bsDropdown.hide();
+                const bsDropdown = bootstrap.Dropdown.getInstance(dropdown.previousElementSibling);
+                if (bsDropdown) {
+                    bsDropdown.hide();
+                }
             });
         }
     </script>

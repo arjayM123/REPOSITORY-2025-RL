@@ -47,6 +47,46 @@ $totalUsers = $totalUsersResult->fetch(PDO::FETCH_ASSOC)['total'];
 $totalVisitorsQuery = "SELECT COUNT(*) as total FROM visitors";
 $totalVisitorsResult = $pdo->query($totalVisitorsQuery);
 $totalVisitors = $totalVisitorsResult->fetch(PDO::FETCH_ASSOC)['total'];
+
+// Get most favorited books
+$mostFavoritedQuery = "SELECT b.title, b.author, b.department, COUNT(bf.book_id) as favorite_count
+                       FROM books b
+                       INNER JOIN book_favorites bf ON b.id = bf.book_id
+                       GROUP BY b.id, b.title, b.author, b.department
+                       ORDER BY favorite_count DESC
+                       LIMIT 5";
+$mostFavoritedResult = $pdo->query($mostFavoritedQuery);
+$mostFavorited = $mostFavoritedResult->fetchAll(PDO::FETCH_ASSOC);
+
+// Get most viewed books
+$mostViewedQuery = "SELECT b.title, b.author, b.department, COUNT(bv.book_id) as view_count
+                    FROM books b
+                    INNER JOIN book_views bv ON b.id = bv.book_id
+                    GROUP BY b.id, b.title, b.author, b.department
+                    ORDER BY view_count DESC
+                    LIMIT 5";
+$mostViewedResult = $pdo->query($mostViewedQuery);
+$mostViewed = $mostViewedResult->fetchAll(PDO::FETCH_ASSOC);
+
+// Get total favorites count
+$totalFavoritesQuery = "SELECT COUNT(*) as total FROM book_favorites";
+$totalFavoritesResult = $pdo->query($totalFavoritesQuery);
+$totalFavorites = $totalFavoritesResult->fetch(PDO::FETCH_ASSOC)['total'];
+
+// Get total views count
+$totalViewsQuery = "SELECT COUNT(*) as total FROM book_views";
+$totalViewsResult = $pdo->query($totalViewsQuery);
+$totalViews = $totalViewsResult->fetch(PDO::FETCH_ASSOC)['total'];
+
+// Get total book requests
+$totalRequestsQuery = "SELECT COUNT(*) as total FROM book_requests";
+$totalRequestsResult = $pdo->query($totalRequestsQuery);
+$totalRequests = $totalRequestsResult->fetch(PDO::FETCH_ASSOC)['total'] ?? 0;
+
+// Get all book requests
+$requestsQuery = "SELECT * FROM book_requests ORDER BY requested_at DESC";
+$requestsResult = $pdo->query($requestsQuery);
+$bookRequests = $requestsResult->fetchAll(PDO::FETCH_ASSOC);
 ?>
 
 <!DOCTYPE html>
@@ -106,17 +146,17 @@ $totalVisitors = $totalVisitorsResult->fetch(PDO::FETCH_ASSOC)['total'];
                 </div>
             </div>
 
-            <!-- Total Visitors Card -->
+            <!-- Total Book Requests Card -->
             <div class="col-xl-3 col-md-6 mb-4">
                 <div class="card border-left-warning shadow h-100 py-2 border-start border-4 border-warning">
                     <div class="card-body">
                         <div class="row no-gutters align-items-center">
                             <div class="col mr-2">
-                                <div class="text-xs fw-bold text-warning text-uppercase mb-1">Site Visitors</div>
-                                <div class="h5 mb-0 fw-bold text-gray-800"><?php echo number_format($totalVisitors); ?></div>
+                                <div class="text-xs fw-bold text-warning text-uppercase mb-1">Total Book Requests</div>
+                                <div class="h5 mb-0 fw-bold text-gray-800"><?php echo number_format($totalRequests); ?></div>
                             </div>
                             <div class="col-auto">
-                                <i class="bi bi-eye text-warning" style="font-size: 2rem;"></i>
+                                <i class="bi bi-journal-plus text-warning" style="font-size: 2rem;"></i>
                             </div>
                         </div>
                     </div>
@@ -159,7 +199,7 @@ $totalVisitors = $totalVisitorsResult->fetch(PDO::FETCH_ASSOC)['total'];
                                                 <td class="text-center">
                                                     <div class="progress" style="height: 20px;">
                                                         <div class="progress-bar bg-info" role="progressbar" 
-                                                             style="width: <?php echo $percentage; ?>%" 
+                                                             style="width: <?php echo number_format($percentage, 1) . '%'; ?>%" 
                                                              aria-valuenow="<?php echo $percentage; ?>" 
                                                              aria-valuemin="0" aria-valuemax="100">
                                                             <?php echo number_format($percentage, 1); ?>%
@@ -230,6 +270,123 @@ $totalVisitors = $totalVisitorsResult->fetch(PDO::FETCH_ASSOC)['total'];
             </div>
         </div>
 
+        <!-- Most Favorite and Most Viewed Books Row -->
+        <div class="row mb-4">
+            <!-- Most Favorited Books -->
+            <div class="col-xl-6 col-lg-6 mb-4">
+                <div class="card shadow h-100">
+                    <div class="card-header py-3 d-flex align-items-center justify-content-between">
+                        <h6 class="m-0 fw-bold text-info">Most Favorited Books</h6>
+                        <i class="bi bi-heart-fill text-info"></i>
+                    </div>
+                    <div class="card-body">
+                        <?php if (!empty($mostFavorited)): ?>
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Book Title</th>
+                                            <th>Author</th>
+                                            <th class="text-center">Department</th>
+                                            <th class="text-center">Favorites</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($mostFavorited as $index => $book): ?>
+                                            <tr>
+                                                <td>
+                                                    <div class="d-flex align-items-center">
+                                                        <span class="badge bg-info rounded-circle me-2" style="font-size: 0.7rem;">
+                                                            <?php echo $index + 1; ?>
+                                                        </span>
+                                                        <span class="fw-semibold"><?php echo htmlspecialchars($book['title']); ?></span>
+                                                    </div>
+                                                </td>
+                                                <td><?php echo htmlspecialchars($book['author']); ?></td>
+                                                <td class="text-center">
+                                                    <span class="badge bg-secondary rounded-pill" style="font-size: 0.7rem;">
+                                                        <?php echo htmlspecialchars($book['department']); ?>
+                                                    </span>
+                                                </td>
+                                                <td class="text-center">
+                                                    <span class="badge bg-info rounded-pill">
+                                                        <i class="bi bi-heart-fill me-1"></i>
+                                                        <?php echo $book['favorite_count']; ?>
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <?php else: ?>
+                            <div class="text-center py-4">
+                                <i class="bi bi-heart display-4 text-muted"></i>
+                                <p class="text-muted mt-3">No favorited books yet</p>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Most Viewed Books -->
+            <div class="col-xl-6 col-lg-6 mb-4">
+                <div class="card shadow h-100">
+                    <div class="card-header py-3 d-flex align-items-center justify-content-between">
+                        <h6 class="m-0 fw-bold text-warning">Most Viewed Books</h6>
+                        <i class="bi bi-eye-fill text-warning"></i>
+                    </div>
+                    <div class="card-body">
+                        <?php if (!empty($mostViewed)): ?>
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>Book Title</th>
+                                            <th>Author</th>
+                                            <th class="text-center">Department</th>
+                                            <th class="text-center">Views</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($mostViewed as $index => $book): ?>
+                                            <tr>
+                                                <td>
+                                                    <div class="d-flex align-items-center">
+                                                        <span class="badge bg-warning rounded-circle me-2" style="font-size: 0.7rem;">
+                                                            <?php echo $index + 1; ?>
+                                                        </span>
+                                                        <span class="fw-semibold"><?php echo htmlspecialchars($book['title']); ?></span>
+                                                    </div>
+                                                </td>
+                                                <td><?php echo htmlspecialchars($book['author']); ?></td>
+                                                <td class="text-center">
+                                                    <span class="badge bg-secondary rounded-pill" style="font-size: 0.7rem;">
+                                                        <?php echo htmlspecialchars($book['department']); ?>
+                                                    </span>
+                                                </td>
+                                                <td class="text-center">
+                                                    <span class="badge bg-warning rounded-pill">
+                                                        <i class="bi bi-eye-fill me-1"></i>
+                                                        <?php echo $book['view_count']; ?>
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <?php else: ?>
+                            <div class="text-center py-4">
+                                <i class="bi bi-eye display-4 text-muted"></i>
+                                <p class="text-muted mt-3">No book views yet</p>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Recent Books Section -->
         <div class="row">
             <div class="col-12">
@@ -275,6 +432,60 @@ $totalVisitors = $totalVisitorsResult->fetch(PDO::FETCH_ASSOC)['total'];
                             <div class="text-center py-4">
                                 <i class="bi bi-book display-4 text-muted"></i>
                                 <p class="text-muted mt-3">No recent books found</p>
+                            </div>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Book Requests Section -->
+        <div class="row">
+            <div class="col-12">
+                <div class="card shadow mb-4">
+                    <div class="card-header py-3 d-flex align-items-center justify-content-between">
+                        <h6 class="m-0 fw-bold text-primary">Book Requests</h6>
+                    </div>
+                    <div class="card-body">
+                        <?php if (!empty($bookRequests)): ?>
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead class="table-light">
+                                        <tr>
+                                            <th>#</th>
+                                            <th>Name</th>
+                                            <th>ID Number</th>
+                                            <th>Book Title</th>
+                                            <th>Author</th>
+                                            <th>Copy</th>
+                                            <th>Year</th>
+                                            <th>Contact</th>
+                                            <th>Address</th>
+                                            <th>Date Requested</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($bookRequests as $i => $req): ?>
+                                            <tr>
+                                                <td><?php echo $i + 1; ?></td>
+                                                <td><?php echo !empty($req['student_name']) ? htmlspecialchars($req['student_name']) : 'N/A'; ?></td>
+                                                <td><?php echo !empty($req['id_number']) ? htmlspecialchars($req['id_number']) : 'N/A'; ?></td>
+                                                <td><?php echo !empty($req['book_title']) ? htmlspecialchars($req['book_title']) : 'N/A'; ?></td>
+                                                <td><?php echo !empty($req['book_author']) ? htmlspecialchars($req['book_author']) : 'N/A'; ?></td>
+                                                <td><?php echo !empty($req['book_copy']) ? htmlspecialchars($req['book_copy']) : 'N/A'; ?></td>
+                                                <td><?php echo !empty($req['book_year']) ? htmlspecialchars($req['book_year']) : 'N/A'; ?></td>
+                                                <td><?php echo !empty($req['contact']) ? htmlspecialchars($req['contact']) : 'N/A'; ?></td>
+                                                <td><?php echo !empty($req['address']) ? htmlspecialchars($req['address']) : 'N/A'; ?></td>
+                                                <td><?php echo !empty($req['requested_at']) ? date('M d, Y H:i', strtotime($req['requested_at'])) : 'N/A'; ?></td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        <?php else: ?>
+                            <div class="text-center py-4">
+                                <i class="bi bi-journal-plus display-4 text-muted"></i>
+                                <p class="text-muted mt-3">No book requests found</p>
                             </div>
                         <?php endif; ?>
                     </div>
