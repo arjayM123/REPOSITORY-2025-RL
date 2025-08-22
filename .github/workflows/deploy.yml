@@ -3,7 +3,7 @@ name: 🚀 Deploy to InfinityFree
 on:
   push:
     branches:
-      - master   # listens to master branch
+      - master
 
 jobs:
   deploy:
@@ -22,4 +22,9 @@ jobs:
         port: ${{ secrets.FTP_PORT }}
         protocol: ftp
         server-dir: ${{ secrets.FTP_DIR }}
-        local-dir: ./   # Upload everything in repo root
+        local-dir: ./  
+        exclude: |
+          **/.git*
+          **/.github*
+          **/node_modules/*
+          **/*.md
