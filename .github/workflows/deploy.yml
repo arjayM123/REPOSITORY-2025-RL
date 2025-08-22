@@ -3,10 +3,12 @@ name: 🚀 Deploy to InfinityFree
 on:
   push:
     branches:
-      - main   # change to master if your repo uses master
+      - master
+
 
 jobs:
   deploy:
+  
     runs-on: ubuntu-latest
 
     steps:
