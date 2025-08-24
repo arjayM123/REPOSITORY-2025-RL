@@ -26,7 +26,8 @@ $whereConditions = [];
 $params = [];
 
 if ($view === 'active') {
-    $whereConditions[] = "is_deleted = 0 AND (status IS NULL OR status != 'locked')";
+    // Show only non-deleted books (regardless of status - active should show all non-deleted books)
+    $whereConditions[] = "is_deleted = 0";
     $orderBy = " ORDER BY created_at DESC";
 } elseif ($view === 'deleted') {
     $whereConditions[] = "is_deleted = 1";
@@ -40,6 +41,10 @@ if ($view === 'active') {
 } elseif ($view === 'favorite') {
     $whereConditions[] = "is_deleted = 0";
     $orderBy = " ORDER BY favorite_count DESC, created_at DESC";
+} elseif ($view === 'all') {
+    // Show all non-deleted books
+    $whereConditions[] = "is_deleted = 0";
+    $orderBy = " ORDER BY created_at DESC";
 }
 
 // Add search conditions
