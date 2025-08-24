@@ -26,7 +26,11 @@ $whereConditions = [];
 $params = [];
 
 if ($view === 'active') {
-    // Show only non-deleted books (regardless of status - active should show all non-deleted books)
+    // Show only non-deleted books that are NOT locked (active/unlocked books only)
+    $whereConditions[] = "is_deleted = 0 AND (status IS NULL OR status != 'locked')";
+    $orderBy = " ORDER BY created_at DESC";
+} elseif ($view === 'all') {
+    // Show all non-deleted books (both active and locked)
     $whereConditions[] = "is_deleted = 0";
     $orderBy = " ORDER BY created_at DESC";
 } elseif ($view === 'deleted') {
@@ -41,12 +45,7 @@ if ($view === 'active') {
 } elseif ($view === 'favorite') {
     $whereConditions[] = "is_deleted = 0";
     $orderBy = " ORDER BY favorite_count DESC, created_at DESC";
-} elseif ($view === 'all') {
-    // Show all non-deleted books
-    $whereConditions[] = "is_deleted = 0";
-    $orderBy = " ORDER BY created_at DESC";
 }
-
 // Add search conditions
 if (!empty($search)) {
     $whereConditions[] = "(title LIKE ? OR author LIKE ? OR isbn_issn LIKE ?)";
@@ -80,14 +79,23 @@ try {
     $stmt = $pdo->prepare($query);
     $stmt->execute($params);
     $books = $stmt->fetchAll(PDO::FETCH_ASSOC);
-
     // Statistics queries
     $stats = [];
 
-    // Total books (active only)
+    // Total books (active only - non-deleted)
     $stmt = $pdo->prepare("SELECT COUNT(*) as total FROM books WHERE is_deleted = 0");
     $stmt->execute();
     $stats['total_books'] = $stmt->fetch(PDO::FETCH_ASSOC)['total'];
+
+    // Active books count (non-deleted and not locked)
+    $stmt = $pdo->prepare("SELECT COUNT(*) as total FROM books WHERE is_deleted = 0 AND (status IS NULL OR status != 'locked')");
+    $stmt->execute();
+    $stats['active_books'] = $stmt->fetch(PDO::FETCH_ASSOC)['total'];
+
+    // Locked books count
+    $stmt = $pdo->prepare("SELECT COUNT(*) as total FROM books WHERE is_deleted = 0 AND status = 'locked'");
+    $stmt->execute();
+    $stats['locked_books'] = $stmt->fetch(PDO::FETCH_ASSOC)['total'];
 
     // Books by department with totals
     $stmt = $pdo->prepare("SELECT department, COUNT(*) as count FROM books WHERE is_deleted = 0 AND department IS NOT NULL AND department != '' GROUP BY department ORDER BY count DESC");
@@ -106,7 +114,7 @@ try {
     $stmt->execute();
     $stats['by_material'] = $stmt->fetchAll(PDO::FETCH_ASSOC);
 
-    // Status distribution
+    // Status distribution (for statistics modal)
     $stmt = $pdo->prepare("SELECT 
         SUM(CASE WHEN status = 'active' OR status IS NULL THEN 1 ELSE 0 END) as active,
         SUM(CASE WHEN status = 'locked' THEN 1 ELSE 0 END) as locked
@@ -206,23 +214,21 @@ try {
 
 <!-- View Tabs -->
 <ul class="nav nav-pills mb-4">
-        <li class="nav-item">
+    <li class="nav-item">
         <a class="nav-link <?php echo $view === 'all' ? 'active' : ''; ?>" href="#" onclick="changeView('all')">
-            <i class="bi bi-list me-1"></i>All Books
+            <i class="bi bi-list me-1"></i>All Books (<?php echo $stats['total_books']; ?>)
         </a>
     </li>
     <li class="nav-item">
         <a class="nav-link <?php echo $view === 'active' ? 'active' : ''; ?>" href="#" onclick="changeView('active')">
-            <i class="bi bi-check-circle me-1"></i>Active Books (<?php echo $stats['total_books']; ?>)
+            <i class="bi bi-check-circle me-1"></i>Active Books (<?php echo $stats['active_books']; ?>)
         </a>
     </li>
     <li class="nav-item">
         <a class="nav-link <?php echo $view === 'locked' ? 'active' : ''; ?>" href="#" onclick="changeView('locked')">
-            <i class="bi bi-lock me-1"></i>Locked Books (<?php echo $stats['total_books']; ?>)
+            <i class="bi bi-lock me-1"></i>Locked Books (<?php echo $stats['locked_books']; ?>)
         </a>
     </li>
-
-
     <li class="nav-item">
         <a class="nav-link <?php echo $view === 'popular' ? 'active' : ''; ?>" href="#" onclick="changeView('popular')">
             <i class="bi bi-eye me-1"></i>Popular
@@ -240,7 +246,7 @@ try {
             <i class="bi bi-journal-plus me-1"></i>Book Requests
         </a>
     </li>
-        <li class="nav-item">
+    <li class="nav-item">
         <a class="nav-link <?php echo $view === 'deleted' ? 'active' : ''; ?>" href="#" onclick="changeView('deleted')">
             <i class="bi bi-trash me-1"></i>Deleted Books (<?php echo $stats['deleted_books']; ?>)
         </a>
