@@ -165,7 +165,20 @@
             <div class="row border-top border-secondary pt-4 mt-4">
                 <div class="col-md-6">
                     <div class="d-flex align-items-center">
-                        <img src="../assets/images/images-removebg-preview.png" alt="ISUR-ORA Logo" height="40" class="me-3">
+                        <!-- <img src="../assets/images/images-removebg-preview.png" alt="ISUR-ORA Logo" height="40" class="me-3"> -->
+                        <?php
+                        // Add this function at the top of your footer.php
+                        function getImagePath() {
+                            $currentPath = $_SERVER['PHP_SELF'];
+                            if (strpos($currentPath, '/user/') !== false) {
+                                return "../assets/images/images-removebg-preview.png";
+                            }
+                            return "./Ebook/assets/images/images-removebg-preview.png";
+                        }
+                        ?>
+
+                        <!-- Replace the existing image tag with this -->
+                        <img src="<?php echo getImagePath(); ?>" alt="ISUR-ORA Logo" height="40" class="me-3">
                         <div>
                             <div class="fw-bold text-white">ISUR-ORA</div>
                             <small class="text-light opacity-75">Digital Library System</small>

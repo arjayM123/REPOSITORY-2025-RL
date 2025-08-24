@@ -983,5 +983,12 @@ function showDeleteRequestModal(requestId) {
         return true;
     };
 }
+function showPermanentDeleteModal(bookId, bookTitle) {
+    document.getElementById('permanent-delete-book-id').value = bookId;
+    document.getElementById('permanent-delete-book-title').textContent = bookTitle;
+
+    const modal = new bootstrap.Modal(document.getElementById('permanentDeleteModal'));
+    modal.show();
+}
 
 </script>

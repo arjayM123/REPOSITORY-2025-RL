@@ -13,8 +13,20 @@
     <nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm fixed-top">
         <div class="container-fluid px-3 px-lg-4">
             <!-- Logo Section -->
-            <a class="navbar-brand d-flex align-items-center text-decoration-none" href="index.php">
-                <img src="../assets/images/images-removebg-preview.png" alt="ISUR-ORA Logo" height="45" class="me-2">
+            <?php
+            // Add this at the top of _layout.php
+            function getBasePath() {
+                $currentPath = $_SERVER['PHP_SELF'];
+                if (strpos($currentPath, '/user/') !== false) {
+                    return '../../'; // Go up two levels from user folder
+                }
+                return './'; // Root level
+            }
+            $basePath = getBasePath();
+            ?>
+            <a class="navbar-brand d-flex align-items-center text-decoration-none" href="<?php echo $basePath; ?>index.php">
+                <img src="<?php echo $basePath; ?>Ebook/assets/images/images-removebg-preview.png" 
+                     alt="ISUR-ORA Logo" height="45" class="me-2">
                 <div>
                     <div class="fw-bold fs-4 text-dark mb-0 lh-1">ISUR-ORA</div>
                     <small class="text-muted">Digital Library</small>
@@ -31,7 +43,8 @@
                 <ul class="navbar-nav ms-auto">
                     <!-- Home -->
                     <li class="nav-item">
-                        <a class="nav-link fw-medium px-3 <?php echo basename($_SERVER['PHP_SELF']) == 'index.php' ? 'active text-primary' : ''; ?>" href="index.php">
+                        <a class="nav-link fw-medium px-3 <?php echo basename($_SERVER['PHP_SELF']) == 'index.php' ? 'active text-primary' : ''; ?>" 
+                           href="<?php echo $basePath; ?>index.php">
                             <i class="bi bi-house me-1"></i>Home
                         </a>
                     </li>
@@ -112,14 +125,16 @@
 
                     <!-- Requested Books -->
                     <li class="nav-item">
-                        <a class="nav-link fw-medium px-3 <?php echo basename($_SERVER['PHP_SELF']) == 'book_request.php' ? 'active text-primary' : ''; ?>" href="book_request.php">
+                        <a class="nav-link fw-medium px-3 <?php echo basename($_SERVER['PHP_SELF']) == 'book_request.php' ? 'active text-primary' : ''; ?>" 
+                           href="<?php echo $basePath; ?>Ebook/user/book_request.php">
                             <i class="bi bi-bookmark me-1"></i>Request a Book
                         </a>
                     </li>
 
                     <!-- About Us -->
                     <li class="nav-item">
-                        <a class="nav-link fw-medium px-3 <?php echo basename($_SERVER['PHP_SELF']) == 'footer.php' ? 'active text-primary' : ''; ?>" href="#about-footer">
+                        <a class="nav-link fw-medium px-3" 
+                           href="<?php echo $basePath; ?>index.php#about-footer">
                             <i class="bi bi-info-circle me-1"></i>About Us
                         </a>
                     </li>
@@ -134,13 +149,16 @@
     <!-- Filter function that works with the index page -->
     <script>
         function applyFilter(material, course) {
+            // Get the base path
+            const basePath = <?php echo json_encode($basePath); ?>;
+            
             // Check if we're on the index page and if the filtering function exists
             if (typeof window.filterBooksByCategory === 'function') {
                 // Call the index page filter function
                 window.filterBooksByCategory(material, course);
             } else {
                 // For other pages, redirect to index with parameters
-                let url = 'index.php?';
+                let url = basePath + 'index.php?';
                 if (material !== 'all') url += 'material=' + encodeURIComponent(material) + '&';
                 if (course !== 'all') url += 'course=' + encodeURIComponent(course) + '&';
                 window.location.href = url.replace(/[&?]$/, '');

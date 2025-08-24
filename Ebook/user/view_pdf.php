@@ -207,7 +207,7 @@ if (isset($_GET['id'])) {
         <button class="btn btn-outline-info btn-sm" data-bs-toggle="modal" data-bs-target="#bookInfoModal">
             <i class="fas fa-info-circle"></i> <span class="d-none d-md-inline">Book Info</span>
         </button>
-        <a href="index.php" class="btn btn-outline-light btn-sm">
+        <a href="../../index.php" class="btn btn-outline-light btn-sm">
             <i class="fas fa-times"></i> <span class="d-none d-md-inline">Close Reader</span>
         </a>
     </div>

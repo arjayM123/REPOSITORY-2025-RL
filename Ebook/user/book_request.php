@@ -108,7 +108,7 @@ include "_layout.php";
                             </button>
                         </form>
                         <div class="mt-4">
-                            <a href="index.php" class="btn btn-link"><i class="bi bi-arrow-left"></i> Back to Home</a>
+                            <a href="../../index.php" class="btn btn-link"><i class="bi bi-arrow-left"></i> Back to Home</a>
                         </div>
                     </div>
                 </div>

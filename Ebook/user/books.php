@@ -57,7 +57,7 @@ include "_layout.php";
 
             <!-- Back Button -->
             <div class="mb-4">
-                <a href="index.php" class="btn btn-outline-primary btn-sm">
+                <a href="../../index.php" class="btn btn-outline-primary btn-sm">
                     <i class="bi bi-arrow-left me-1"></i> Back to Home
                 </a>
             </div>
@@ -78,7 +78,7 @@ include "_layout.php";
                             <a href="view_pdf.php?id=<?php echo $book['id']; ?>" class="text-decoration-none">
                                 <div class=" bg-light">
                                     <img src="<?php echo htmlspecialchars($imagePath); ?>"
-                                         class="img-fluid "
+                                         class="img-fluid rounded"
                                          alt="<?php echo htmlspecialchars($book['title']); ?>" 
                                          loading="lazy"
                                          onerror="this.src='../assets/images/genericBookCover.jpg';">
@@ -117,7 +117,7 @@ include "_layout.php";
         </div>
     </section>
 </div>
-
+<?php include 'footer.php'; ?>
 <?php
 // OPTION 3: JavaScript function to expand categories in the same page
 // Add this JavaScript function to your existing script section:

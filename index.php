@@ -1,7 +1,6 @@
 <?php
-require_once '../includes/db.php';
-require_once '../includes/tracking_functions.php';
-
+require_once './Ebook/includes/db.php';
+require_once './Ebook/includes/tracking_functions.php';
 // Set page configuration
 $pageTitle = 'Home - ISUR-ORA Digital Library';
 
@@ -24,7 +23,7 @@ $materialTypesResult = $pdo->query($materialTypesQuery);
 $availableMaterialTypes = $materialTypesResult->fetchAll(PDO::FETCH_COLUMN);
 
 // Include the header
-include "_layout.php";
+include "./Ebook/user/_layout.php";
 ?>
 <style>
 .book-restricted {
@@ -371,7 +370,7 @@ html, body {
                                             <span class="badge bg-primary rounded-pill px-3 py-2 category-count">
                                                 <?php echo $bookCount; ?> book<?php echo $bookCount > 1 ? 's' : ''; ?>
                                             </span>
-                                            <a href="books.php?material=<?php echo urlencode($materialType); ?>" 
+                                            <a href="./Ebook/user/books.php?material=<?php echo urlencode($materialType); ?>" 
                                                class="btn btn-warning btn-sm rounded-pill px-3 fw-semibold">
                                                 View All <i class="bi bi-arrow-right ms-1"></i>
                                             </a>
@@ -395,11 +394,21 @@ html, body {
                                            <?php
 foreach ($books as $book) {
     // Determine image path
-    if (empty($book['cover_image']) || $book['cover_image'] === 'genericBookCover.jpg') {
+if (empty($book['cover_image']) || $book['cover_image'] === 'genericBookCover.jpg') {
+    // Check first path for generic cover
+    if (file_exists('../assets/images/genericBookCover.jpg')) {
         $imagePath = '../assets/images/genericBookCover.jpg';
     } else {
-        $imagePath = '../uploads/covers/' . $book['cover_image'];
+        $imagePath = './Ebook/assets/images/genericBookCover.jpg';
     }
+} else {
+    // Check first path for book cover
+    if (file_exists('../uploads/covers/' . $book['cover_image'])) {
+        $imagePath = '../uploads/covers/' . $book['cover_image'];
+    } else {
+        $imagePath = './Ebook/uploads/covers/' . $book['cover_image'];
+    }
+}
     
     // Check if this book is favorited by current user
     $isFavorited = checkIfFavorited($pdo, $book['id']);
@@ -431,7 +440,7 @@ foreach ($books as $book) {
                          onerror="this.src='../assets/images/genericBookCover.jpg';">
                 <?php else: ?>
                     <!-- Clickable Link for Unlocked Books -->
-                    <a href="view_pdf.php?id=<?php echo $book['id']; ?>" 
+                    <a href="Ebook/user/view_pdf.php?id=<?php echo $book['id']; ?>" 
                        class="text-decoration-none book-link d-block h-100" 
                        data-book-id="<?php echo $book['id']; ?>">
                         <img src="<?php echo htmlspecialchars($imagePath); ?>" 
@@ -560,7 +569,7 @@ foreach ($books as $book) {
 </div>
 
 
-<?php include 'footer.php'; ?>
+<?php include './Ebook/user/footer.php'; ?>
 <script>
     // Global variables
     let searchTimeout;
@@ -865,7 +874,7 @@ foreach ($books as $book) {
         // Disable link temporarily
         link.style.pointerEvents = 'none';
         
-        fetch('ajax_favorite.php', {
+        fetch('./Ebook/user/ajax_favorite.php', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',

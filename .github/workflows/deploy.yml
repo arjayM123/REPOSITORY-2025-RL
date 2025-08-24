@@ -22,4 +22,3 @@ jobs:
         port: ${{ secrets.FTP_PORT }}
         server-dir: ora.gt.tc/htdocs/   # 👈 files go here
         local-dir: ./   # everything from repo root
-        method: ftp
